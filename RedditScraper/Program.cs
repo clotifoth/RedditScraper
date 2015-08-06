@@ -56,6 +56,7 @@ namespace RedditScraper
                 {
                     doc = web.Load(s);
                 }
+
                 HtmlNode result = doc.DocumentNode.SelectSingleNode(XPath);
 
                 String resultsPath = Path.Combine(Environment.CurrentDirectory);
@@ -68,7 +69,20 @@ namespace RedditScraper
                     }
                 }
 
-                resultsPath += Path.DirectorySeparatorChar + (s.Substring(62).Replace('/', '_')) + ".txt";
+                int topicNameLength = 0;
+                char[] sArray = s.ToCharArray();
+
+                for (int i = 26; // https://www.reddit.com/r/ length
+                    i < sArray.Length - 2;
+                    i++)
+                {
+                    if(sArray[i] == '/')
+                    {
+                        topicNameLength = i+1;
+                    }
+                }
+
+                    resultsPath += Path.DirectorySeparatorChar + (s.Substring(topicNameLength).Replace('/', '_')) + ".txt";
 
                 File.WriteAllText((resultsPath), result.InnerHtml);
             }
