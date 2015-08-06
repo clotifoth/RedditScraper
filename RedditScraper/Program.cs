@@ -42,6 +42,7 @@ namespace RedditScraper
                 System.Environment.Exit(-1);
             }
 
+
             string XPath = "//div[@class='expando']/div[@class='usertext-body may-blank-within md-container ']/div[@class='md']"; // Text content of a reddit post.
             HtmlWeb web = new HtmlWeb();
             
@@ -50,11 +51,11 @@ namespace RedditScraper
                 HtmlDocument doc;
                 if (s.ToCharArray()[s.Length - 1] == '/')
                 {
-                    doc = web.Load(s + "?ref=search_posts");
+                    doc = web.Load(s + "?ref=search_posts"); /* Reddit sometimes rejects posts with no referral tag. */
                 }
                 else
                 {
-                    doc = web.Load(s);
+                    doc = web.Load(s); /* If you added your own tag, you must know what you're doing... */
                 }
 
                 HtmlNode result = doc.DocumentNode.SelectSingleNode(XPath);
@@ -70,19 +71,37 @@ namespace RedditScraper
                 }
 
                 int topicNameLength = 0;
+                int subRedditNameStart = 0;
+                int subRedditNameEnd = 0;
+                bool subRedditEnd = false;
                 char[] sArray = s.ToCharArray();
 
-                for (int i = 26; // https://www.reddit.com/r/ length
+                /* Find the last '/' that is involved in the URL structure; from
+                 * this point forward, it's the topic.
+                 */
+
+                for (int i = 23; // https://www.reddit.com/r/ length
                     i < sArray.Length - 2;
                     i++)
                 {
                     if(sArray[i] == '/')
                     {
-                        topicNameLength = i+1;
+                        if(topicNameLength == 0) // I should use a boolean, but this is prob. faster
+                        {                        // It's 0 when the first / hasn't been found yet
+                            subRedditNameStart = i + 1;
+                        }
+                        else if(!subRedditEnd)
+                        {
+                            subRedditNameEnd = i + 1;
+                            subRedditEnd = true;
+                        }
+                        topicNameLength = i + 1;
                     }
                 }
+                Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, s.Substring(subRedditNameStart, subRedditNameEnd - subRedditNameStart)));
 
-                    resultsPath += Path.DirectorySeparatorChar + (s.Substring(topicNameLength).Replace('/', '_')) + ".txt";
+                    resultsPath += Path.DirectorySeparatorChar + s.Substring(subRedditNameStart, subRedditNameEnd - subRedditNameStart);
+                    resultsPath += Path.DirectorySeparatorChar + s.Substring(topicNameLength).Replace('/', '_') + ".txt";
 
                 File.WriteAllText((resultsPath), result.InnerHtml);
             }
