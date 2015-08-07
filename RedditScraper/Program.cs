@@ -42,69 +42,100 @@ namespace RedditScraper
                 System.Environment.Exit(-1);
             }
 
-
-            string XPath = "//div[@class='expando']/div[@class='usertext-body may-blank-within md-container ']/div[@class='md']"; // Text content of a reddit post.
+            
+            string mainContentXPath = "//div[@class='expando']/div[@class='usertext-body may-blank-within md-container ']/div[@class='md']"; // Text content of a reddit post.
+            string commentsXPath = "//div[@class='commentarea']/div[@class='sitetable nestedlisting']"; // Comments content of a reddit post.
             HtmlWeb web = new HtmlWeb();
             
-            foreach(String s in URLs)
+            foreach(string redditURL in URLs)
             {
                 HtmlDocument doc;
-                if (s.ToCharArray()[s.Length - 1] == '/')
+                if (redditURL.ToCharArray()[redditURL.Length - 1] == '/')
                 {
-                    doc = web.Load(s + "?ref=search_posts"); /* Reddit sometimes rejects posts with no referral tag. */
+                    doc = web.Load(redditURL + "?ref=search_posts"); /* Reddit sometimes rejects posts with no referral tag. */
                 }
                 else
                 {
-                    doc = web.Load(s); /* If you added your own tag, you must know what you're doing... */
+                    doc = web.Load(redditURL); /* If you added your own tag, you must know what you're doing... */
                 }
 
-                HtmlNode result = doc.DocumentNode.SelectSingleNode(XPath);
-
-                String resultsPath = Path.Combine(Environment.CurrentDirectory);
-
-                for (int i = resultsPath.Length -1; i < 0; i--)
+                if(doc == null)
                 {
-                    if (resultsPath[i] == '/' || !Char.IsLetterOrDigit(resultsPath[i]))
-                    {
-                        resultsPath.ToCharArray()[i] = '_';
-                    }
+                    Console.WriteLine("Problem with " + redditURL + "!");
+                    continue;
                 }
 
-                int topicNameLength = 0;
-                int subRedditNameStart = 0;
-                int subRedditNameEnd = 0;
-                bool subRedditEnd = false;
-                char[] sArray = s.ToCharArray();
 
-                /* Find the last '/' that is involved in the URL structure; from
-                 * this point forward, it's the topic.
-                 */
+                string resultsPath = Path.Combine(Environment.CurrentDirectory);
 
-                for (int i = 23; // https://www.reddit.com/r/ length
+                string subRedditName = GetSubRedditName(redditURL);
+                string subRedditDirectory = subRedditName;
+                Directory.CreateDirectory(subRedditDirectory);
+                Directory.CreateDirectory(subRedditDirectory + Path.DirectorySeparatorChar + GetThreadName(redditURL));
+
+                resultsPath += Path.DirectorySeparatorChar + subRedditDirectory;
+                resultsPath += Path.DirectorySeparatorChar + GetThreadName(redditURL);
+
+                HtmlNode mainContent = doc.DocumentNode.SelectSingleNode(mainContentXPath);
+                File.WriteAllText((resultsPath + Path.DirectorySeparatorChar + "content.html"), mainContent.InnerHtml);
+
+                Console.WriteLine(subRedditName + '/' + GetThreadName(redditURL) + " main content pulled successfully!");
+
+                HtmlNode comments = doc.DocumentNode.SelectSingleNode(commentsXPath);
+                File.WriteAllText((resultsPath + Path.DirectorySeparatorChar + "comments.html"), comments.InnerHtml);
+
+                Console.WriteLine(subRedditName + '/' + GetThreadName(redditURL) + " comments pulled successfully!");
+            }
+
+            Console.WriteLine(URLs.Count + " reddit thread(s) processed.");
+        }
+
+        public static string GetSubRedditName(string URL)
+        {
+            int subRedditNameStart = 0;
+            int subRedditNameEnd = 0;
+            char[] sArray = URL.ToCharArray();
+
+
+            /* Find the last '/' that is involved in the URL structure; from
+             * this point forward, it'redditURL the topic.
+             */
+
+            for (int i = 23; // https://www.reddit.com/r/ length
                     i < sArray.Length - 2;
                     i++)
+            {
+                if (sArray[i] == '/')
                 {
-                    if(sArray[i] == '/')
+                    if (subRedditNameStart == 0) // I should use a boolean, but this is prob. faster
+                    {                        // It'redditURL 0 when the first / hasn't been found yet
+                        subRedditNameStart = i + 1;
+                    }
+                    else if (subRedditNameEnd == 0)
                     {
-                        if(topicNameLength == 0) // I should use a boolean, but this is prob. faster
-                        {                        // It's 0 when the first / hasn't been found yet
-                            subRedditNameStart = i + 1;
-                        }
-                        else if(!subRedditEnd)
-                        {
-                            subRedditNameEnd = i + 1;
-                            subRedditEnd = true;
-                        }
-                        topicNameLength = i + 1;
+                        subRedditNameEnd = i;
+                        break;
                     }
                 }
-                Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, s.Substring(subRedditNameStart, subRedditNameEnd - subRedditNameStart)));
-
-                    resultsPath += Path.DirectorySeparatorChar + s.Substring(subRedditNameStart, subRedditNameEnd - subRedditNameStart);
-                    resultsPath += Path.DirectorySeparatorChar + s.Substring(topicNameLength).Replace('/', '_') + ".txt";
-
-                File.WriteAllText((resultsPath), result.InnerHtml);
             }
+            return URL.Substring(subRedditNameStart, subRedditNameEnd - subRedditNameStart);
+        }
+
+        public static string GetThreadName(string URL)
+        {
+            int topicNameLength = 0;
+            char[] sArray = URL.ToCharArray();
+
+            for (int i = 23; // https://www.reddit.com/r/ length
+                    i < sArray.Length - 2;
+                    i++)
+            {
+                if (sArray[i] == '/')
+                {
+                    topicNameLength = i + 1;
+                }
+            }
+            return URL.Substring(topicNameLength).Replace('/', '_');
         }
     }
 }
