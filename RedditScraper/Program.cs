@@ -46,9 +46,13 @@ namespace RedditScraper
                 System.Environment.Exit(-1);
             }
 
-            
+            string votesXPath = "//div[@class='midcol unvoted']"; // Text content of a reddit post.
+            string thumbnailXPath = "//a[@class='thumbnail may-blank ']"; // Text content of a reddit post.
             string mainContentXPath = "//div[@class='entry unvoted']"; // Text content of a reddit post.
             string commentsXPath = "//div[@class='commentarea']/div[@class='sitetable nestedlisting']"; // Comments content of a reddit post.
+            string subRedditCSSXPath = "//link[@rel='stylesheet' and @title='applied_subreddit_stylesheet']"; // CSS for a subreddit.
+            string primaryCSSXPath = "//link[@rel='stylesheet' and @media='all']"; // Reddit's CSS.
+
             HtmlWeb web = new HtmlWeb();
 
             web.UserAgent = "Spooky Creepy Crawlies!"; // Reddit slows down non-default UserAgents that make automated requests
@@ -93,23 +97,51 @@ namespace RedditScraper
                 Directory.CreateDirectory(subRedditDirectory);
                 Directory.CreateDirectory(subRedditDirectory + Path.DirectorySeparatorChar + GetThreadName(redditURL));
 
+
                 resultsPath += Path.DirectorySeparatorChar + subRedditDirectory;
                 resultsPath += Path.DirectorySeparatorChar + GetThreadName(redditURL);
 
-                HtmlNode mainContent = doc.DocumentNode.SelectSingleNode(mainContentXPath);
 
-                if (mainContent == null)
+                HtmlNode primaryRedditCSS = doc.DocumentNode.SelectSingleNode(primaryCSSXPath);
+                primaryRedditCSS.SetAttributeValue("href", "http:" + primaryRedditCSS.GetAttributeValue("href", ""));
+                    
+                HtmlNode subRedditCSS = doc.DocumentNode.SelectSingleNode(subRedditCSSXPath);
+                HtmlNode mainContent = doc.DocumentNode.SelectSingleNode(mainContentXPath);
+                HtmlNode comments = doc.DocumentNode.SelectSingleNode(commentsXPath);
+                HtmlNode thumbnail = doc.DocumentNode.SelectSingleNode(thumbnailXPath);
+                HtmlNode votes = doc.DocumentNode.SelectSingleNode(votesXPath);
+
+                if (mainContent == null || comments == null || votes == null)
                 {
                     Console.WriteLine("Problem with " + redditURL + "!");
                     continue;
                 }
 
-                File.WriteAllText((resultsPath + Path.DirectorySeparatorChar + "content.html"), mainContent.InnerHtml);
+                string contenthtml = "<html>" + Environment.NewLine +
+                                    "<head>" + Environment.NewLine +
+                                    primaryRedditCSS.OuterHtml + Environment.NewLine +
+                                    subRedditCSS.OuterHtml + Environment.NewLine +
+                                    "</head>" + Environment.NewLine +
+                                    votes.OuterHtml + Environment.NewLine;
+
+                if (!(thumbnail == null))
+                {
+                    contenthtml += thumbnail.OuterHtml + Environment.NewLine;
+                }
+
+                contenthtml += mainContent.OuterHtml + Environment.NewLine + "</html>";
+
+                File.WriteAllText((resultsPath + Path.DirectorySeparatorChar + "content.html"), contenthtml);
 
                 Console.WriteLine(subRedditName + '/' + GetThreadName(redditURL) + " main content pulled successfully!");
 
-                HtmlNode comments = doc.DocumentNode.SelectSingleNode(commentsXPath);
-                File.WriteAllText((resultsPath + Path.DirectorySeparatorChar + "comments.html"), comments.InnerHtml);
+                File.WriteAllText((resultsPath + Path.DirectorySeparatorChar + "comments.html"), "<html>" + Environment.NewLine +
+                                                                                        "<head>" + Environment.NewLine +
+                                                                                        primaryRedditCSS.OuterHtml + Environment.NewLine +
+                                                                                            subRedditCSS.OuterHtml + Environment.NewLine +
+                                                                                        "</head>" + Environment.NewLine +
+                                                                                            comments.InnerHtml + Environment.NewLine +
+                                                                                            "</html>");
 
                 Console.WriteLine(subRedditName + '/' + GetThreadName(redditURL) + " comments pulled successfully!");
 
